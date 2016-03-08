@@ -14,6 +14,7 @@ Package: jasmine-gjs
 Architecture: all
 Depends: ${misc:Depends},
          gir1.2-glib-2.0,
+         gir1.2-gtk-3.0,
          gjs (>= 1.39.3)
 Description: Behavior-driven development framework for GJS
  This module allows you to run Jasmine specs for your GJS code. The output will
