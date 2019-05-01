@@ -34,6 +34,9 @@ function loadConfig(configFilePath) {
 
     try {
         let [, contents] = configFile.load_contents(null);
+        if (contents instanceof Uint8Array) {
+            contents = imports.byteArray.toString(contents)
+        }
         config = JSON.parse(contents);
     } catch (e) {
         throw new Error('Configuration not read from ' + configFile.get_path());
@@ -164,7 +167,9 @@ function run(_jasmine, argv, config={}, timeout=-1) {
         // report directories that don't exist.
         try {
             junitFile.get_parent().make_directory_with_parents(null);
-        } catch (e if e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.EXISTS)) {
+        } catch (e) {
+            if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.EXISTS))
+                throw e;
             // ignore error if directory already exists
         }
 
@@ -188,6 +193,7 @@ function run(_jasmine, argv, config={}, timeout=-1) {
         show_colors: options.color,
         timerFactory: Timer.createDefaultTimer,
     };
+    let exitCode = 0;
 
     let reporter;
     if (options.verbose) {
@@ -201,9 +207,9 @@ function run(_jasmine, argv, config={}, timeout=-1) {
         reporter = new ConsoleReporter.DefaultReporter(reporterOptions);
     }
     reporter.connect('started', () => Mainloop.source_remove(timeoutId));
-    reporter.connect('complete', (success) => {
+    reporter.connect('complete', (reporter, success) => {
         if (!success)
-            System.exit(1);
+            exitCode = 1;
         Mainloop.quit('jasmine');
     });
     _jasmine.addReporter(reporter);
@@ -216,7 +222,8 @@ function run(_jasmine, argv, config={}, timeout=-1) {
                 print('Bail out! Test suite failed to start within 10 seconds');
             else
                 printerr('Test suite failed to start within 10 seconds');
-            System.exit(1);
+            exitCode = 1;
+            Mainloop.quit('jasmine');
         });
     }
 
@@ -235,12 +242,13 @@ function run(_jasmine, argv, config={}, timeout=-1) {
                 printerr(e);
                 printerr(e.stack);
             }
-            System.exit(1);
+            exitCode = 1;
+            Mainloop.quit('jasmine');
         }
         return GLib.SOURCE_REMOVE;
     });
 
     // _jasmine.execute() queues up all the tests and runs them asynchronously.
     Mainloop.run('jasmine');
-    return 0;
+    return exitCode;
 }
